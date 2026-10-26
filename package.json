@@ -1,0 +1,14 @@
+{
+  "name": "budget-cal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A private, offline-first personal budget control web app.",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
