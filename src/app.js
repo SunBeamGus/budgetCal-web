@@ -416,7 +416,6 @@ function renderOverview() {
   const progress = state.privacyMode
     ? 0
     : Math.min(Math.max(summary.budgetProgress, 0), 100);
-  const assetSummary = getAssetSummary(state.assets, summary.netCents);
 
   app.innerHTML = `
     <section class="page-heading">
@@ -432,17 +431,16 @@ function renderOverview() {
     </section>
 
     <section class="highlight-grid" aria-label="Financial highlights">
-      <article class="highlight-card highlight-assets">
+      <article class="highlight-card highlight-cashflow ${summary.netCents < 0 ? "is-negative" : ""}">
         <div class="highlight-topline">
           <span class="highlight-icon">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10 12 4l9 6M5 10v9m4-9v9m6-9v9m4-9v9M3 21h18"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17 9 12l3 3 7-8"/><path d="M15 7h4v4"/></svg>
           </span>
-          <span>Total assets</span>
+          <span>Cash flow</span>
         </div>
-        <strong>${money(assetSummary.totalAssetsCents)}</strong>
+        <strong>${money(summary.netCents)}</strong>
         <div class="highlight-footer">
-          <span>Net worth ${money(assetSummary.netWorthCents)}</span>
-          <button class="text-button" type="button" data-tab-target="assets">View assets</button>
+          <span>${money(summary.incomeCents)} income · ${money(summary.expenseCents)} expenses</span>
         </div>
       </article>
       <article class="highlight-card highlight-budget">

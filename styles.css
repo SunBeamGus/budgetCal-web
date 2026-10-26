@@ -640,24 +640,28 @@ main {
   white-space: nowrap;
 }
 
-.highlight-assets {
+.highlight-cashflow {
   border-color: var(--forest);
   background: var(--forest);
   color: #fffdf8;
 }
 
-.highlight-assets .highlight-topline,
-.highlight-assets .highlight-footer {
+.highlight-cashflow .highlight-topline,
+.highlight-cashflow .highlight-footer {
   color: rgb(255 253 248 / 60%);
 }
 
-.highlight-assets .highlight-icon {
+.highlight-cashflow .highlight-icon {
   background: rgb(255 255 255 / 10%);
   color: var(--gold);
 }
 
-.highlight-assets > strong {
+.highlight-cashflow > strong {
   color: var(--gold);
+}
+
+.highlight-cashflow.is-negative > strong {
+  color: #f39d84;
 }
 
 .highlight-budget {
@@ -697,7 +701,7 @@ main {
   font-size: 0.64rem;
 }
 
-.highlight-assets .highlight-footer .text-button {
+.highlight-cashflow .highlight-footer .text-button {
   color: rgb(255 253 248 / 72%);
 }
 
@@ -2487,7 +2491,7 @@ main {
     grid-template-columns: 1fr 1fr;
   }
 
-  .highlight-assets {
+  .highlight-cashflow {
     grid-column: 1 / -1;
   }
 
@@ -2640,7 +2644,7 @@ main {
     padding: 17px;
   }
 
-  .highlight-assets {
+  .highlight-cashflow {
     grid-column: 1 / -1;
   }
 
