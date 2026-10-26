@@ -5,10 +5,17 @@
   "type": "module",
   "description": "A private, offline-first personal budget control web app.",
   "scripts": {
-    "start": "node scripts/serve.mjs",
+    "start": "node scripts/run.mjs local",
+    "start:local": "node scripts/run.mjs local",
+    "start:lan": "node scripts/run.mjs lan",
+    "start:host": "node scripts/run.mjs host",
+    "start:mysql": "node scripts/run.mjs mysql",
     "test": "node --test"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.6"
   }
 }

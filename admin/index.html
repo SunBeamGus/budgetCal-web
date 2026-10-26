@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#182e2a" />
+    <title>Budget Cal Admin</title>
+    <link rel="icon" href="../assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../admin.css" />
+  </head>
+  <body>
+    <header class="admin-topbar">
+      <a class="admin-brand" href="../">
+        <span class="admin-logo">B</span>
+        <span>
+          <strong>Budget Cal</strong>
+          <small>Administration</small>
+        </span>
+      </a>
+      <a class="back-link" href="../">Back to budgeting site</a>
+    </header>
+    <main id="admin-app">
+      <div class="admin-loading">Loading administration…</div>
+    </main>
+    <div class="admin-toast" id="admin-toast" role="status" aria-live="polite"></div>
+    <script type="module" src="../src/admin.js"></script>
+  </body>
+</html>

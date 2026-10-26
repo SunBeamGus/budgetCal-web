@@ -1,0 +1,23 @@
+[Unit]
+Description=Budget Cal personal finance application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=budgetcal
+Group=budgetcal
+WorkingDirectory=/opt/budget-cal
+EnvironmentFile=/etc/budget-cal/budget-cal.env
+ExecStart=/usr/bin/node /opt/budget-cal/scripts/serve.mjs
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/budget-cal
+
+[Install]
+WantedBy=multi-user.target

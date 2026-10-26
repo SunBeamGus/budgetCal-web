@@ -1,10 +1,17 @@
 export const DEFAULT_CATEGORIES = [
-  { name: "Housing", color: "#d45d3f" },
-  { name: "Groceries", color: "#3f826d" },
-  { name: "Dining", color: "#d89b35" },
-  { name: "Transport", color: "#3f74a8" },
-  { name: "Utilities", color: "#8b68a8" },
-  { name: "Leisure", color: "#c35b8d" },
+  { name: "Housing", color: "#d45d3f", group: "essentials" },
+  { name: "Groceries", color: "#3f826d", group: "essentials" },
+  { name: "Dining", color: "#d89b35", group: "lifestyle" },
+  { name: "Transport", color: "#3f74a8", group: "essentials" },
+  { name: "Utilities", color: "#8b68a8", group: "essentials" },
+  { name: "Leisure", color: "#c35b8d", group: "lifestyle" },
+];
+
+export const BUDGET_GROUPS = [
+  { id: "essentials", label: "Essentials", color: "#3f826d" },
+  { id: "lifestyle", label: "Lifestyle", color: "#d89b35" },
+  { id: "financial", label: "Financial", color: "#3f74a8" },
+  { id: "other", label: "Other", color: "#89918d" },
 ];
 
 export const CATEGORY_COLORS = [
@@ -17,6 +24,32 @@ export const CATEGORY_COLORS = [
   "#687a3c",
   "#976b43",
 ];
+
+export const COMMON_CURRENCIES = [
+  "SGD",
+  "USD",
+  "EUR",
+  "GBP",
+  "JPY",
+  "CNY",
+  "MYR",
+  "AUD",
+  "CAD",
+  "HKD",
+  "INR",
+  "THB",
+  "KRW",
+  "IDR",
+  "PHP",
+  "TWD",
+];
+
+export const SUPPORTED_CURRENCIES =
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("currency")
+    : [...COMMON_CURRENCIES];
+
+const SUPPORTED_ISO_CURRENCIES = new Set(SUPPORTED_CURRENCIES);
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat("en", {
   month: "long",
@@ -91,13 +124,84 @@ export function parseAmountToCents(value) {
   return Math.round((amount + Number.EPSILON) * 100);
 }
 
-export function formatCurrency(cents, currency = "SGD", locale = "en-SG") {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
+export function normalizeCurrencyCode(value, fallback = "SGD") {
+  const code = String(value ?? "").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : fallback;
+}
+
+export function isValidCurrencyCode(value) {
+  const code = normalizeCurrencyCode(value, "");
+  if (!code) {
+    return false;
+  }
+  return SUPPORTED_ISO_CURRENCIES.has(code);
+}
+
+export function parseExchangeRate(value) {
+  const normalized = String(value ?? "").trim().replaceAll(",", "");
+  if (!normalized || !Number.isFinite(Number(normalized))) {
+    return null;
+  }
+  const rate = Number(normalized);
+  return rate > 0 ? Math.round(rate * 100000000) / 100000000 : null;
+}
+
+export function convertToBaseCents(amountCents, exchangeRate = 1) {
+  const amount = Number(amountCents) || 0;
+  const rate = Number(exchangeRate);
+  return Math.round(amount * (Number.isFinite(rate) && rate > 0 ? rate : 1));
+}
+
+export function getTransactionBaseCents(transaction) {
+  const baseAmount = Number(transaction.baseAmountCents);
+  if (Number.isFinite(baseAmount) && baseAmount >= 0) {
+    return Math.round(baseAmount);
+  }
+  return convertToBaseCents(transaction.amountCents, transaction.exchangeRate);
+}
+
+export function normalizeTransactionCurrency(transaction, baseCurrency = "SGD") {
+  const currency = normalizeCurrencyCode(transaction.currency, baseCurrency);
+  const exchangeRate =
+    currency === baseCurrency ? 1 : parseExchangeRate(transaction.exchangeRate) || 1;
+  return {
+    ...transaction,
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format((Number(cents) || 0) / 100);
+    exchangeRate,
+    baseAmountCents: getTransactionBaseCents({
+      ...transaction,
+      currency,
+      exchangeRate,
+    }),
+  };
+}
+
+export function normalizeAssetCurrency(asset, baseCurrency = "SGD") {
+  const currency = normalizeCurrencyCode(asset.currency, baseCurrency);
+  const exchangeRate =
+    currency === baseCurrency ? 1 : parseExchangeRate(asset.exchangeRate) || 1;
+  const valueCents = Math.max(0, Math.round(Number(asset.valueCents) || 0));
+  return {
+    ...asset,
+    currency,
+    exchangeRate,
+    baseValueCents: convertToBaseCents(valueCents, exchangeRate),
+    baseCurrency,
+  };
+}
+
+export function formatCurrency(cents, currency = "SGD", locale = "en-SG") {
+  const code = normalizeCurrencyCode(currency);
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format((Number(cents) || 0) / 100);
+  } catch {
+    return `${code} ${((Number(cents) || 0) / 100).toFixed(2)}`;
+  }
 }
 
 export function formatAmountInput(cents) {
@@ -106,6 +210,33 @@ export function formatAmountInput(cents) {
 
 export function inMonth(transaction, month) {
   return String(transaction.date || "").startsWith(`${month}-`);
+}
+
+export function normalizeCategoryGroup(group, categoryName = "") {
+  const normalized = String(group || "").trim().toLowerCase();
+  const aliases = {
+    essential: "essentials",
+    needs: "essentials",
+    wants: "lifestyle",
+    savings: "financial",
+    debt: "financial",
+  };
+  const groupId = aliases[normalized] || normalized;
+  if (BUDGET_GROUPS.some((item) => item.id === groupId)) {
+    return groupId;
+  }
+
+  const name = String(categoryName).toLowerCase();
+  if (/dining|leisure|entertainment|shopping/.test(name)) {
+    return "lifestyle";
+  }
+  if (/saving|invest|loan|debt|credit|mortgage/.test(name)) {
+    return "financial";
+  }
+  if (/housing|grocery|food|transport|utility|utilities|insurance|health/.test(name)) {
+    return "essentials";
+  }
+  return "other";
 }
 
 export function getCategoryRows(categories, allocations, transactions, month) {
@@ -121,7 +252,10 @@ export function getCategoryRows(categories, allocations, transactions, month) {
       continue;
     }
     const categoryId = transaction.categoryId || "uncategorized";
-    spentByCategory.set(categoryId, (spentByCategory.get(categoryId) || 0) + transaction.amountCents);
+    spentByCategory.set(
+      categoryId,
+      (spentByCategory.get(categoryId) || 0) + getTransactionBaseCents(transaction),
+    );
   }
 
   const rows = categories
@@ -134,6 +268,7 @@ export function getCategoryRows(categories, allocations, transactions, month) {
 
       return {
         ...category,
+        group: normalizeCategoryGroup(category.group, category.name),
         budgetCents,
         spentCents,
         remainingCents,
@@ -152,6 +287,7 @@ export function getCategoryRows(categories, allocations, transactions, month) {
       id: "uncategorized",
       name: "Uncategorized",
       color: "#89918d",
+      group: "other",
       archived: false,
       budgetCents: 0,
       spentCents: uncategorizedSpent,
@@ -164,22 +300,70 @@ export function getCategoryRows(categories, allocations, transactions, month) {
   return rows;
 }
 
-export function getMonthSummary(categories, allocations, transactions, month) {
+export function getBudgetGroupSummary(rows, groupBudgets = [], month = "") {
+  return BUDGET_GROUPS.map((group) => {
+    const groupRows = rows.filter(
+      (row) => normalizeCategoryGroup(row.group, row.name) === group.id,
+    );
+    const groupBudget = groupBudgets.find(
+      (budget) => budget.month === month && budget.groupId === group.id,
+    );
+    const plannedCents = Number(groupBudget?.amountCents) || 0;
+    const categoryLimitCents = groupRows.reduce((sum, row) => sum + row.budgetCents, 0);
+    const spentCents = groupRows.reduce((sum, row) => sum + row.spentCents, 0);
+    const remainingCents = plannedCents - spentCents;
+    return {
+      ...group,
+      categoryCount: groupRows.filter((row) => row.id !== "uncategorized").length,
+      plannedCents,
+      categoryLimitCents,
+      spentCents,
+      remainingCents,
+      progress: plannedCents > 0 ? (spentCents / plannedCents) * 100 : spentCents > 0 ? 100 : 0,
+      isOverBudget: spentCents > plannedCents,
+    };
+  });
+}
+
+export function moveCategoryOrder(categories, categoryId, offset) {
+  if (![-1, 1].includes(offset)) {
+    return categories;
+  }
+  const active = categories.filter((category) => !category.archived);
+  const currentIndex = active.findIndex((category) => category.id === categoryId);
+  const targetIndex = currentIndex + offset;
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= active.length) {
+    return categories;
+  }
+
+  [active[currentIndex], active[targetIndex]] = [active[targetIndex], active[currentIndex]];
+  const archived = categories.filter((category) => category.archived);
+  return [...active, ...archived].map((category, index) => ({
+    ...category,
+    sortOrder: index,
+  }));
+}
+
+export function getMonthSummary(categories, allocations, transactions, month, groupBudgets = null) {
   const periodTransactions = transactions.filter((transaction) => inMonth(transaction, month));
   const incomeCents = periodTransactions
     .filter((transaction) => transaction.type === "income")
-    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+    .reduce((sum, transaction) => sum + getTransactionBaseCents(transaction), 0);
   const expenseCents = periodTransactions
     .filter((transaction) => transaction.type === "expense")
-    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
-  const plannedCents = categories
-    .filter((category) => !category.archived)
-    .reduce((sum, category) => {
-      const allocation = allocations.find(
-        (item) => item.month === month && item.categoryId === category.id,
-      );
-      return sum + (allocation?.amountCents || 0);
-    }, 0);
+    .reduce((sum, transaction) => sum + getTransactionBaseCents(transaction), 0);
+  const plannedCents = groupBudgets
+    ? groupBudgets
+        .filter((budget) => budget.month === month)
+        .reduce((sum, budget) => sum + (Number(budget.amountCents) || 0), 0)
+    : categories
+        .filter((category) => !category.archived)
+        .reduce((sum, category) => {
+          const allocation = allocations.find(
+            (item) => item.month === month && item.categoryId === category.id,
+          );
+          return sum + (allocation?.amountCents || 0);
+        }, 0);
 
   return {
     month,
@@ -193,6 +377,24 @@ export function getMonthSummary(categories, allocations, transactions, month) {
   };
 }
 
+export function getAssetSummary(assets, cashFlowCents = 0) {
+  const manualAssetsCents = assets
+    .filter((asset) => asset.kind === "asset")
+    .reduce((sum, asset) => sum + (Number(asset.baseValueCents) || 0), 0);
+  const totalLiabilitiesCents = assets
+    .filter((asset) => asset.kind === "liability")
+    .reduce((sum, asset) => sum + (Number(asset.baseValueCents) || 0), 0);
+
+  return {
+    manualAssetsCents,
+    cashFlowCents,
+    totalAssetsCents: manualAssetsCents + cashFlowCents,
+    totalLiabilitiesCents,
+    netWorthCents: manualAssetsCents + cashFlowCents - totalLiabilitiesCents,
+    itemCount: assets.length,
+  };
+}
+
 export function sortTransactions(transactions) {
   return [...transactions].sort((a, b) => {
     const byDate = String(b.date).localeCompare(String(a.date));
@@ -203,21 +405,26 @@ export function sortTransactions(transactions) {
   });
 }
 
-export function transactionToCsv(transaction, categories) {
+export function transactionToCsv(transaction, categories, baseCurrency = "SGD") {
   const category = categories.find((item) => item.id === transaction.categoryId);
+  const currency = normalizeCurrencyCode(transaction.currency, baseCurrency);
+  const exchangeRate =
+    currency === baseCurrency ? 1 : parseExchangeRate(transaction.exchangeRate) || 1;
   return [
     transaction.date,
     transaction.type,
     category?.name || "",
     formatAmountInput(transaction.amountCents).replace(/\.00$/, ""),
+    currency,
+    String(exchangeRate),
     transaction.note || "",
   ];
 }
 
-export function transactionsToCsv(transactions, categories) {
-  const header = ["date", "type", "category", "amount", "note"];
+export function transactionsToCsv(transactions, categories, baseCurrency = "SGD") {
+  const header = ["date", "type", "category", "amount", "currency", "exchange_rate", "note"];
   const rows = sortTransactions(transactions).map((transaction) =>
-    transactionToCsv(transaction, categories),
+    transactionToCsv(transaction, categories, baseCurrency),
   );
   return [header, ...rows].map((row) => row.map(escapeCsvCell).join(",")).join("\r\n");
 }

@@ -1,18 +1,35 @@
 {
   "name": "Budget Cal",
   "short_name": "Budget Cal",
+  "id": "./",
   "description": "A private, offline-first personal budget planner.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#f3f1e9",
   "theme_color": "#123c36",
+  "prefer_related_applications": false,
+  "categories": ["finance", "productivity"],
   "icons": [
+    {
+      "src": "./assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "./assets/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
