@@ -473,6 +473,16 @@ function tokenMatches(expected, provided) {
   );
 }
 
+function validInvitationHours(value) {
+  const hours = Number(value ?? 168);
+  if (!Number.isInteger(hours) || hours < 1 || hours > 720) {
+    const error = new Error("Invitation expiry must be between 1 and 720 hours.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return hours;
+}
+
 function challengeFromCredential(credential) {
   try {
     return JSON.parse(
@@ -678,20 +688,10 @@ async function handleMysqlAuthApi(request, response, pathname) {
 
   if (pathname === "/api/auth/login/options" && request.method === "POST") {
     try {
-      const body = await readJsonBody(request);
-      const username = String(body.username || "").trim().toLowerCase();
-      const user = await mysqlStore.getUserByUsername(username);
-      const credentials = user
-        ? await mysqlStore.getCredentialsForUser(user.id)
-        : [];
-      if (!user || credentials.length === 0 || user.isDisabled) {
-        throw new Error("No passkey account was found for that username.");
-      }
       const challenge = randomChallenge();
       const origin = allowedOrigin(request);
       mysqlAuthenticationChallenges.set(challenge, {
         challenge,
-        userId: user.id,
         origin,
         expiresAt: Date.now() + 120000,
       });
@@ -700,11 +700,6 @@ async function handleMysqlAuthApi(request, response, pathname) {
         rpId,
         timeout: 120000,
         userVerification: "required",
-        allowCredentials: credentials.map((credential) => ({
-          type: "public-key",
-          id: credential.id,
-          transports: credential.transports || [],
-        })),
       });
     } catch (error) {
       sendJson(response, 400, { error: error.message });
@@ -724,8 +719,12 @@ async function handleMysqlAuthApi(request, response, pathname) {
       const storedCredential = await mysqlStore.getCredentialById(
         payload.credential.id,
       );
-      if (!storedCredential || storedCredential.userId !== pending.userId) {
-        throw new Error("The passkey does not belong to this account.");
+      if (!storedCredential) {
+        throw new Error("This passkey is not registered.");
+      }
+      const user = await mysqlStore.getUserById(storedCredential.userId);
+      if (!user || user.isDisabled) {
+        throw new Error("This account is unavailable.");
       }
       const result = verifyAuthentication({
         response: payload.credential,
@@ -739,7 +738,7 @@ async function handleMysqlAuthApi(request, response, pathname) {
         response,
         200,
         { authenticated: true },
-        { "Set-Cookie": issueSession(response, pending.userId) },
+        { "Set-Cookie": issueSession(response, storedCredential.userId) },
       );
     } catch (error) {
       sendJson(response, 400, { error: error.message });
@@ -954,6 +953,7 @@ async function handleApi(request, response, pathname) {
         const body = await readJsonBody(request);
         const workspaceId = String(body.workspaceId || "");
         const role = body.role === "viewer" ? "viewer" : "editor";
+        const expirationHours = validInvitationHours(body.expirationHours);
         const workspaces = await mysqlStore.listAllWorkspaces();
         if (!workspaces.some((workspace) => workspace.workspaceId === workspaceId)) {
           sendJson(response, 404, { error: "Workspace not found." });
@@ -965,10 +965,11 @@ async function handleApi(request, response, pathname) {
           tokenHash: hashInvitationToken(inviteToken),
           role,
           createdBy: adminId,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + expirationHours * 60 * 60 * 1000),
         });
         sendJson(response, 200, {
           role,
+          expirationHours,
           url: `${publicOrigin}/?invite=${encodeURIComponent(inviteToken)}`,
         });
         return true;
@@ -1218,17 +1219,19 @@ async function handleApi(request, response, pathname) {
         return true;
       }
       const role = body.role === "viewer" ? "viewer" : "editor";
+      const expirationHours = validInvitationHours(body.expirationHours);
       const token = randomBytes(32).toString("base64url");
       await mysqlStore.createInvitation({
         workspaceId: membership.workspaceId,
         tokenHash: hashInvitationToken(token),
         role,
         createdBy: context.user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + expirationHours * 60 * 60 * 1000),
       });
       sendJson(response, 200, {
         token,
         role,
+        expirationHours,
         url: `${publicOrigin}/?invite=${encodeURIComponent(token)}`,
       });
     } catch (error) {

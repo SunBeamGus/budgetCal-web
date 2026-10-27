@@ -1,4 +1,4 @@
-const CACHE_NAME = "budget-cal-v6";
+const CACHE_NAME = "budget-cal-v7";
 const APP_SHELL = [
   "./",
   "./index.html",

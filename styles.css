@@ -2245,6 +2245,16 @@ main {
   font-size: 0.64rem;
 }
 
+.settings-workspace-select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
 .inline-settings-form {
   display: grid;
   grid-template-columns: 100px 1fr;
@@ -3111,14 +3121,6 @@ main {
     font-size: 0.88rem;
   }
 
-  .workspace-bar {
-    padding: 7px 8px;
-  }
-
-  .workspace-bar select {
-    min-height: 40px;
-  }
-
   .host-auth-state {
     padding-inline: 14px;
   }
@@ -3219,47 +3221,6 @@ main {
   color: var(--ink-soft);
   font-size: 0.78rem;
   line-height: 1.5;
-}
-
-.workspace-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgb(255 253 248 / 75%);
-  box-shadow: var(--shadow-sm);
-}
-
-.workspace-bar label {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 9px;
-  color: var(--ink-faint);
-  font-size: 0.67rem;
-  font-weight: 750;
-  text-transform: uppercase;
-}
-
-.workspace-bar select {
-  min-width: 220px;
-  max-width: 100%;
-  padding: 8px 30px 8px 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 0.76rem;
-  font-weight: 650;
-  text-transform: none;
-}
-
-.workspace-bar .button {
-  min-height: 36px;
 }
 
 .invite-signin-link {
@@ -3436,19 +3397,4 @@ main {
     flex: 1;
   }
 
-  .workspace-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .workspace-bar label {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .workspace-bar select {
-    width: 100%;
-    min-width: 0;
-  }
 }

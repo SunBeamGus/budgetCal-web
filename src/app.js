@@ -75,8 +75,6 @@ const toast = document.querySelector("#toast");
 const storageStatus = document.querySelector("#storage-status");
 const connectionStatus = document.querySelector("#connection-status");
 const accessBanner = document.querySelector("#access-banner");
-const workspaceBar = document.querySelector("#workspace-bar");
-const workspaceSelect = document.querySelector("#workspace-select");
 
 const state = {
   settings: defaultSettings(),
@@ -281,21 +279,6 @@ function updatePrivacyToggle() {
   label.textContent = state.privacyMode ? "Show" : "Hide";
 }
 
-function updateWorkspaceSwitcher() {
-  const visible = state.storageMode === "mysql" && state.workspaces.length > 0;
-  workspaceBar.hidden = !visible;
-  if (!visible) {
-    workspaceSelect.innerHTML = "";
-    return;
-  }
-  workspaceSelect.innerHTML = state.workspaces
-    .map(
-      (workspace) =>
-        `<option value="${escapeHtml(workspace.workspaceId)}" ${workspace.workspaceId === state.activeWorkspaceId ? "selected" : ""}>${escapeHtml(workspace.workspaceName)} · ${escapeHtml(workspace.role)}</option>`,
-    )
-    .join("");
-}
-
 function isRunningStandalone() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
@@ -328,7 +311,6 @@ async function lockHost() {
     state.groupBudgets = [];
     closeModal();
     const auth = await getHostAuthStatus();
-    state.storageMode = "host";
     showAuthGate(auth);
   } catch (error) {
     console.error(error);
@@ -367,7 +349,6 @@ function progressMarkup(row) {
 
 function render() {
   updatePrivacyToggle();
-  updateWorkspaceSwitcher();
   accessBanner.hidden = !state.readOnly;
   accessBanner.textContent = state.readOnly
     ? "Viewer access: this shared budget is read-only."
@@ -1847,6 +1828,24 @@ function openDataModal() {
           : ""
       }
       ${
+        state.storageMode === "mysql" && state.workspaces.length > 0
+          ? `<section class="currency-settings">
+              <div>
+                <strong>Active workspace</strong>
+                <p>Budget Cal opens your last selected workspace automatically.</p>
+              </div>
+              <select id="settings-workspace-select" class="settings-workspace-select" aria-label="Active workspace">
+                ${state.workspaces
+                  .map(
+                    (workspace) =>
+                      `<option value="${escapeHtml(workspace.workspaceId)}" ${workspace.workspaceId === state.activeWorkspaceId ? "selected" : ""}>${escapeHtml(workspace.workspaceName)} · ${escapeHtml(workspace.role)}</option>`,
+                  )
+                  .join("")}
+              </select>
+            </section>`
+          : ""
+      }
+      ${
         state.storageMode === "mysql"
           ? `<section class="passkey-settings">
               <div class="passkey-settings-heading">
@@ -2707,11 +2706,6 @@ function bindEvents() {
     state.selectedMonth = currentMonth();
     render();
   });
-  workspaceSelect.addEventListener("change", async () => {
-    if (!workspaceSelect.value) return;
-    setActiveWorkspace(workspaceSelect.value);
-    await startApplication();
-  });
   document.querySelector("#open-data").addEventListener("click", openDataModal);
   document.querySelector("#privacy-toggle").addEventListener("click", () => {
     state.privacyMode = !state.privacyMode;
@@ -2810,7 +2804,7 @@ function bindEvents() {
     }
   });
 
-  modalContent.addEventListener("change", (event) => {
+  modalContent.addEventListener("change", async (event) => {
     if (event.target.id === "transaction-modal-type") {
       syncTransactionTypeField();
     }
@@ -2830,6 +2824,11 @@ function bindEvents() {
           return openAdminModal();
         })
         .catch((error) => showToast(error.message || "Could not update the role.", "error"));
+    }
+    if (event.target.id === "settings-workspace-select") {
+      setActiveWorkspace(event.target.value);
+      closeModal();
+      await startApplication();
     }
   });
 
@@ -3057,13 +3056,13 @@ function showAuthGate(auth) {
       <p>
         ${
           registered
-            ? "Enter your username and approve the passkey prompt."
+            ? "Approve the passkey prompt to continue to your last workspace."
             : "Create a platform passkey using Windows Hello, Touch ID, Face ID, Android screen lock, or another WebAuthn authenticator."
         }
       </p>
       <div class="auth-fields">
         ${
-          isMultiUser
+          !registered && isMultiUser
             ? `<label class="host-registration-token">
                 <span>Username</span>
                 <input id="account-username" type="text" autocomplete="username" maxlength="40" required />
@@ -3124,11 +3123,7 @@ function showAuthGate(auth) {
     button.textContent = registered ? "Waiting for passkey…" : "Creating passkey…";
     try {
       if (registered) {
-        const username = document.querySelector("#account-username")?.value.trim() || "";
-        if (isMultiUser && !username) {
-          throw new Error("Enter your username.");
-        }
-        await loginHostPasskey(username);
+        await loginHostPasskey();
       } else {
         const username = document.querySelector("#account-username")?.value.trim() || "";
         const displayName =

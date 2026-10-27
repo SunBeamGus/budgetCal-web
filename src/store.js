@@ -161,22 +161,18 @@ export async function registerPasskeyAccount({
   hostStatePromise = null;
 }
 
-export async function loginHostPasskey(username = "") {
+export async function loginHostPasskey() {
   if (!window.PublicKeyCredential || !navigator.credentials?.get) {
     throw new Error("This browser does not support passkeys.");
   }
   const options = await hostRequest("/api/auth/login/options", {
     method: "POST",
-    body: JSON.stringify({ username }),
+    body: "{}",
   });
   const credential = await navigator.credentials.get({
     publicKey: {
       ...options,
       challenge: fromBase64url(options.challenge),
-      allowCredentials: (options.allowCredentials || []).map((item) => ({
-        ...item,
-        id: fromBase64url(item.id),
-      })),
     },
   });
   if (!credential) {
@@ -501,10 +497,17 @@ export async function seedDefaults() {
             archived: false,
             createdAt: now,
           }));
-    await putRecordsByStore({
-      meta: [settings],
-      categories,
-    });
+    try {
+      await putRecordsByStore({
+        meta: [settings],
+        categories,
+      });
+    } catch (error) {
+      if (/read-only/i.test(error.message || "")) {
+        return loadAppData();
+      }
+      throw error;
+    }
     return loadAppData();
   }
 

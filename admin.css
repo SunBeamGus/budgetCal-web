@@ -194,6 +194,67 @@ button {
   margin-bottom: 24px;
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 16px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgb(255 253 248 / 70%);
+  box-shadow: var(--shadow);
+}
+
+.admin-tabs button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 39px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.admin-tabs button.active {
+  background: var(--green);
+  color: white;
+}
+
+.admin-tabs button span {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  padding-inline: 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 15%);
+  font-size: 0.6rem;
+}
+
+.admin-tabs button:not(.active) span {
+  background: #ebe7dc;
+}
+
+.admin-panel[hidden] {
+  display: none;
+}
+
+.panel-description {
+  margin: -6px 0 14px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.workspace-create-card {
+  margin-bottom: 16px;
+}
+
 .page-title h1 {
   margin-bottom: 5px;
 }
@@ -393,6 +454,11 @@ button {
 @media (max-width: 800px) {
   .admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-tabs button {
+    padding-inline: 5px;
+    font-size: 0.64rem;
   }
 
   .admin-header {

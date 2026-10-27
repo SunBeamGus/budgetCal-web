@@ -10,6 +10,7 @@ const app = document.querySelector("#admin-app");
 const toast = document.querySelector("#admin-toast");
 let toastTimer;
 let adminEventsBound = false;
+let adminActiveTab = "users";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -84,9 +85,8 @@ function renderLogin() {
     <section class="admin-auth">
       <div class="admin-auth-card">
         <h1>Administrator sign-in</h1>
-        <p>Only the system administrator account can access this console.</p>
+        <p>Approve the administrator passkey prompt. No username is required.</p>
         <form class="admin-form" id="login-form">
-          <label><span>Admin username</span><input name="username" autocomplete="username" required /></label>
           <button class="admin-button primary" type="submit">Continue with passkey</button>
         </form>
         <p><a class="back-link" href="../">Return to budgeting site</a></p>
@@ -98,8 +98,7 @@ function renderLogin() {
     const submit = event.submitter;
     submit.disabled = true;
     try {
-      const username = new FormData(event.target).get("username");
-      await loginHostPasskey(username);
+      await loginHostPasskey();
       await startAdmin();
     } catch (error) {
       showToast(error.message || "Administrator sign-in failed.", "error");
@@ -175,9 +174,16 @@ async function renderDashboard(admin) {
       <button class="admin-button secondary" id="admin-signout" type="button">Sign out</button>
     </header>
 
-    <section class="admin-grid">
+    <nav class="admin-tabs" aria-label="Administration sections">
+      <button type="button" data-admin-tab="users">Users <span>${data.users.length}</span></button>
+      <button type="button" data-admin-tab="workspaces">Workspaces <span>${data.workspaces.length}</span></button>
+      <button type="button" data-admin-tab="invitations">Invitations <span>${data.invitations.length}</span></button>
+    </nav>
+
+    <section class="admin-panel" data-admin-panel="users">
       <article class="admin-card">
         <h2>Users</h2>
+        <p class="panel-description">Accounts and passkeys are managed independently from workspace membership.</p>
         <div class="item-list">
           ${data.users
             .map(
@@ -200,14 +206,86 @@ async function renderDashboard(admin) {
             .join("")}
         </div>
       </article>
+    </section>
 
-      <article class="admin-card">
+    <section class="admin-panel" data-admin-panel="workspaces" hidden>
+      <article class="admin-card workspace-create-card">
         <h2>Create workspace</h2>
         <form class="inline-form" id="workspace-form">
           <input name="name" maxlength="80" placeholder="Household or project name" required />
           <button class="admin-button primary" type="submit">Create</button>
         </form>
-        <h3>Pending invitations</h3>
+        <p class="panel-description">Creating a workspace does not add the administrator as a member.</p>
+      </article>
+
+      ${data.workspaces
+        .map(
+          (workspace) => `
+            <section class="admin-card workspace-admin">
+              <div class="workspace-admin-header">
+                <div>
+                  <h2>${escapeHtml(workspace.workspaceName)}</h2>
+                  <small>${workspace.memberCount} members · ${workspace.pendingInvitationCount} pending invites</small>
+                </div>
+                <div class="workspace-admin-actions">
+                  <form class="inline-form workspace-invite-form" data-workspace-id="${escapeHtml(workspace.workspaceId)}">
+                    <select name="role">
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <select name="expirationHours" aria-label="Invitation expiration">
+                      <option value="1">Expires in 1 hour</option>
+                      <option value="24">Expires in 24 hours</option>
+                      <option value="72">Expires in 3 days</option>
+                      <option value="168" selected>Expires in 7 days</option>
+                      <option value="720">Expires in 30 days</option>
+                    </select>
+                    <button class="admin-button primary" type="submit">Create invite</button>
+                  </form>
+                  <button
+                    class="admin-button danger"
+                    type="button"
+                    data-delete-workspace="${escapeHtml(workspace.workspaceId)}"
+                    data-workspace-name="${escapeHtml(workspace.workspaceName)}"
+                  >
+                    Delete workspace
+                  </button>
+                </div>
+              </div>
+              <div class="member-list">
+                ${workspace.members
+                  .map(
+                    (member) => `
+                      <div class="member-row">
+                        <div>
+                          <strong>${escapeHtml(member.displayName)}</strong>
+                          <small>@${escapeHtml(member.username)}</small>
+                        </div>
+                        ${
+                          member.role === "owner"
+                            ? '<span class="owner-label">Owner</span>'
+                            : `<select data-member-workspace="${escapeHtml(workspace.workspaceId)}" data-member-id="${escapeHtml(member.id)}">
+                                <option value="editor" ${member.role === "editor" ? "selected" : ""}>Editor</option>
+                                <option value="viewer" ${member.role === "viewer" ? "selected" : ""}>Viewer</option>
+                              </select>
+                              <button class="admin-button danger" type="button" data-remove-member="${escapeHtml(member.id)}" data-workspace-id="${escapeHtml(workspace.workspaceId)}">Remove</button>`
+                        }
+                      </div>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </section>
+          `,
+        )
+        .join("")}
+      <div id="invite-result"></div>
+    </section>
+
+    <section class="admin-panel" data-admin-panel="invitations" hidden>
+      <article class="admin-card">
+        <h2>Pending invitations</h2>
+        <p class="panel-description">Invitation links are single-use and cannot be recovered after creation.</p>
         <div class="item-list">
           ${
             data.invitations.length
@@ -217,74 +295,18 @@ async function renderDashboard(admin) {
                       <div class="admin-item">
                         <div>
                           <strong>${escapeHtml(invitation.workspaceName)} · ${escapeHtml(invitation.role)}</strong>
-                          <small>Expires ${escapeHtml(new Date(invitation.expiresAt).toLocaleDateString())}</small>
+                          <small>Expires ${escapeHtml(new Date(invitation.expiresAt).toLocaleString())}</small>
                         </div>
                         <button class="admin-button danger" type="button" data-revoke-invite="${escapeHtml(invitation.id)}">Revoke</button>
                       </div>
                     `,
                   )
                   .join("")
-              : '<p class="page-title"><small>No pending invitations.</small></p>'
+              : '<p class="panel-description">No pending invitations.</p>'
           }
         </div>
-        <div id="invite-result"></div>
       </article>
     </section>
-
-    ${data.workspaces
-      .map(
-        (workspace) => `
-          <section class="admin-card workspace-admin">
-            <div class="workspace-admin-header">
-              <div>
-                <h2>${escapeHtml(workspace.workspaceName)}</h2>
-                <small>${workspace.memberCount} members · ${workspace.pendingInvitationCount} pending invites</small>
-              </div>
-              <div class="workspace-admin-actions">
-                <form class="inline-form workspace-invite-form" data-workspace-id="${escapeHtml(workspace.workspaceId)}">
-                  <select name="role">
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                  <button class="admin-button primary" type="submit">Create invite</button>
-                </form>
-                <button
-                  class="admin-button danger"
-                  type="button"
-                  data-delete-workspace="${escapeHtml(workspace.workspaceId)}"
-                  data-workspace-name="${escapeHtml(workspace.workspaceName)}"
-                >
-                  Delete workspace
-                </button>
-              </div>
-            </div>
-            <div class="member-list">
-              ${workspace.members
-                .map(
-                  (member) => `
-                    <div class="member-row">
-                      <div>
-                        <strong>${escapeHtml(member.displayName)}</strong>
-                        <small>@${escapeHtml(member.username)}</small>
-                      </div>
-                      ${
-                        member.role === "owner"
-                          ? '<span class="owner-label">Owner</span>'
-                          : `<select data-member-workspace="${escapeHtml(workspace.workspaceId)}" data-member-id="${escapeHtml(member.id)}">
-                              <option value="editor" ${member.role === "editor" ? "selected" : ""}>Editor</option>
-                              <option value="viewer" ${member.role === "viewer" ? "selected" : ""}>Viewer</option>
-                            </select>
-                            <button class="admin-button danger" type="button" data-remove-member="${escapeHtml(member.id)}" data-workspace-id="${escapeHtml(workspace.workspaceId)}">Remove</button>`
-                      }
-                    </div>
-                  `,
-                )
-                .join("")}
-            </div>
-          </section>
-        `,
-      )
-      .join("")}
   `;
 
   document.querySelector("#admin-signout").addEventListener("click", signOut);
@@ -311,9 +333,25 @@ async function renderDashboard(admin) {
     app.addEventListener("submit", adminSubmitHandler);
     adminEventsBound = true;
   }
+  applyAdminTab(adminActiveTab);
+}
+
+function applyAdminTab(tab) {
+  adminActiveTab = tab;
+  document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminTab === tab);
+  });
+  document.querySelectorAll("[data-admin-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.adminPanel !== tab;
+  });
 }
 
 async function adminClickHandler(event) {
+  const tabButton = event.target.closest("button[data-admin-tab]");
+  if (tabButton) {
+    applyAdminTab(tabButton.dataset.adminTab);
+    return;
+  }
   const button = event.target.closest("button[data-toggle-user], button[data-remove-member], button[data-revoke-invite], button[data-copy-invite], button[data-delete-workspace]");
   if (!button) return;
   try {
@@ -373,6 +411,7 @@ async function adminSubmitHandler(event) {
       body: JSON.stringify({
         workspaceId: form.dataset.workspaceId,
         role: new FormData(form).get("role"),
+        expirationHours: Number(new FormData(form).get("expirationHours")),
       }),
     });
     document.querySelector("#invite-result").innerHTML = `
